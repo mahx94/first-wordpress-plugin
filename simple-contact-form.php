@@ -15,7 +15,14 @@ class SimpleContactForm {
 
     public function __construct()
     {
-        add_action('init', array($this, 'create_custom_post_type'));
+        // Create custom post type
+        add_action( 'init', array($this, 'create_custom_post_type') );
+
+        // Add assets (js, css, etc)
+        add_action( 'wp_enqueue_scripts', array($this, 'load_assets') );
+
+        // Add shortcode
+        add_shortcode( 'contact-form', array($this, 'load_shortcode') );
     }
 
     public function create_custom_post_type()
@@ -36,6 +43,31 @@ class SimpleContactForm {
 
         register_post_type('simple_contact_form', $args);
     }
+
+    public function load_assets()
+    {
+        wp_enqueue_style(
+            'simple_contact_form',
+            plugin_dir_url( __FILE__ ) . 'css/simple-contact-form.css',
+            array(),
+            1,
+            'all'
+        );
+
+        wp_enqueue_script(
+            'simple-contact-form',
+            plugin_dir_url( __FILE__ ) . 'js/simple-contact-form.js',
+            array('jquery'),
+            1,
+            true
+        );
+    }
+
+    public function load_shortcode()
+    {
+        return 'Hello, the shortcode is working!';
+    }
+
 }
 
 new SimpleContactForm;
