@@ -23,6 +23,33 @@ class SimpleContactForm {
 
         // Add shortcode
         add_shortcode( 'contact-form', array($this, 'load_shortcode') );
+
+        // Load javascript
+        add_action( 'wp_footer', array($this, 'load_scripts') );
+
+        // Register REST API
+        add_action( 'rest_api_init', array($this, 'register_rest_api') );
+
+        // Create meta boxes
+        add_action( 'add_meta_boxes', array($this, 'create_meta_box') );
+    }
+
+    public function create_meta_box()
+    {
+        add_meta_box( 'custom_contact_form', 'Submission', array($this, 'display_submission'), 'simple_contact_form' );
+    }
+
+    public function display_submission()
+    {
+        $post_meta = get_post_meta(get_the_ID());
+        unset($post_meta["_edit_lock"]);
+        unset($post_meta["_edit_last"]);
+
+        echo "<ul>";
+        foreach($post_meta as $key => $value) {
+            echo "<li><b>" . ucfirst($key) . ":</b> " . $value[0] . "</li>";
+        }
+        echo "</ul>";
     }
 
     public function create_custom_post_type()
@@ -30,10 +57,11 @@ class SimpleContactForm {
         $args = array(
             'public' => true,
             'has_archive' => true, 
-            'supports' => array('title'),
+            'supports' => false,
             'exclude_from_search' => true,
             'publicly_queryable' => false,
-            'capability' => 'manage_options',
+            'capabilities' => array('manage_options' => true, 'create_posts' => false),
+            'map_meta_cap' => true,
             'labels' => array(
                 'name' => 'Contact Form',
                 'singular_name' => 'Contact Form Entry'
@@ -64,8 +92,82 @@ class SimpleContactForm {
     }
 
     public function load_shortcode()
+    { ?>
+        <div id="form_success" style="font-weight:bold; color:green;"></div>
+        <div id="form_error" style="font-weight:bold; color:red;"></div>
+        <div class="simple-contact-form">
+            <h1>Send us an email</h1>
+            <p>Please fill in the form below<p>
+
+            <form id="simple-contact-form__form">
+                <div class="form-group mb-2"><input type="text" name="name" placeholder="Name" class="form-control"></div>
+                <div class="form-group mb-2"><input type="email" name="email" placeholder="Email" class="form-control"></div>
+                <div class="form-group mb-2"><input type="tel" name="phone" placeholder="Phone" class="form-control"></div>
+                <div class="form-group mb-2"><textarea name="message" placeholder="Enter your message here." class="form-control"></textarea></div>
+                <div class="form-group mb-2"><button type="submit" class="btn btn-success btn-block">Send Message</button></div>
+            </form>
+        </div>
+    <?php }
+
+    public function load_scripts()
+    { ?>
+        <script>
+            let nonce = '<?php echo wp_create_nonce('wp_rest'); ?>';
+
+            jQuery('#simple-contact-form__form').submit( function(event) {
+                event.preventDefault();
+                
+                let form = jQuery(this);
+
+                jQuery.ajax({
+                    method: 'post',
+                    url: '<?php echo get_rest_url(null, 'simple-contact-form/v1/send-email'); ?>',
+                    headers: { 'X-WP-Nonce': nonce },
+                    data: form.serialize(),
+                    success: function(){
+                        form.hide();
+                        jQuery("#form_success").html("Your message was sent!").fadeIn();
+                    },
+                    error: function(){
+                        jQuery("#form_error").html("There was an error submitting your form!").fadeIn();
+                    }
+                })
+            });
+        </script>
+    <?php }
+
+    public function register_rest_api()
     {
-        return 'Hello, the shortcode is working!';
+        register_rest_route( 'simple-contact-form/v1', 'send-email', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'handle_contact_form'),
+        ) );
+    }
+
+    public function handle_contact_form($data)
+    {
+        $headers = $data->get_headers();
+        $params = $data->get_params();
+        $nonce = $headers['x_wp_nonce'][0];
+
+        if (!wp_verify_nonce( $nonce, 'wp_rest' )) {
+            return new WP_REST_Response('Message not sent', 422);
+        }
+
+        $post_id = wp_insert_post( [
+            'post_type' => 'simple_contact_form',
+            'post_title' => $params['name'],
+            'post_status' => 'publish'
+        ] );
+        
+        if ($post_id) {
+            foreach($params as $label => $value) {
+                add_post_meta($post_id, $label, $value);
+            }
+
+            return new WP_REST_Response('Thank you for your email', 200);
+        }
+
     }
 
 }
