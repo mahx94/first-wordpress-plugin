@@ -138,13 +138,13 @@ class SimpleContactForm {
 
         $post_id = wp_insert_post( [
             'post_type' => 'simple_contact_form',
-            'post_title' => $params['name'],
+            'post_title' => sanitize_text_field($params['name']),
             'post_status' => 'publish'
         ] );
         
         if ($post_id) {
             foreach($params as $label => $value) {
-                add_post_meta($post_id, $label, $value);
+                add_post_meta($post_id, $label, sanitize_text_field($value));
             }
 
             return new WP_REST_Response('Thank you for your email', 200);
