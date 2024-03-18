@@ -32,24 +32,12 @@ class SimpleContactForm {
 
         // Create meta boxes
         add_action( 'add_meta_boxes', array($this, 'create_meta_box') );
-    }
 
-    public function create_meta_box()
-    {
-        add_meta_box( 'custom_contact_form', 'Submission', array($this, 'display_submission'), 'simple_contact_form' );
-    }
+        // Make custom submission columns
+        add_filter('manage_simple_contact_form_posts_columns', 'custom_submission_columns');
 
-    public function display_submission()
-    {
-        $post_meta = get_post_meta(get_the_ID());
-        unset($post_meta["_edit_lock"]);
-        unset($post_meta["_edit_last"]);
-
-        echo "<ul>";
-        foreach($post_meta as $key => $value) {
-            echo "<li><b>" . ucfirst($key) . ":</b> " . $value[0] . "</li>";
-        }
-        echo "</ul>";
+        // Fill custom submission columns
+        add_action('manage_simple_contact_form_posts_custom_column', 'fill_submission_columns', 10, 2);
     }
 
     public function create_custom_post_type()
@@ -168,6 +156,55 @@ class SimpleContactForm {
             return new WP_REST_Response('Thank you for your email', 200);
         }
 
+    }
+
+    public function create_meta_box()
+    {
+        add_meta_box( 'custom_contact_form', 'Submission', array($this, 'display_submission'), 'simple_contact_form' );
+    }
+
+    public function display_submission()
+    {
+        $post_meta = get_post_meta(get_the_ID());
+        unset($post_meta["_edit_lock"]);
+        unset($post_meta["_edit_last"]);
+
+        echo "<ul>";
+        foreach($post_meta as $key => $value) {
+            echo "<li><b>" . ucfirst($key) . ":</b> " . $value[0] . "</li>";
+        }
+        echo "</ul>";
+    }
+
+    public function custom_submission_columns($columns) 
+    {
+        $columns = array(
+            'cb' => $columns['cb'],
+            'name' => 'Name',
+            'email' => 'Email',
+            'phone' => 'Phone',
+            'message' => 'Message'
+        );
+
+        return $columns;
+    }
+
+    public function fill_submission_columns($column, $post_id)
+    {
+        switch($column) {
+            case 'name':
+                echo get_post_meta($post_id, 'name', true);
+                break;
+            case 'email':
+                echo get_post_meta($post_id, 'email', true);
+                break;
+            case 'phone':
+                echo get_post_meta($post_id, 'phone', true);
+                break;
+            case 'message':
+                echo get_post_meta($post_id, 'message', true);
+                break;
+        }
     }
 
 }
